@@ -5,6 +5,7 @@ a partir de un MusicXML.
 Autor: Iago (Conservatorio de Música de A Coruña)
 """
 import os
+import random
 import tempfile
 import streamlit as st
 
@@ -34,6 +35,18 @@ GM_PROGRAMS = {
     "Saxofón alto": 65, "Saxofón tenor": 66, "Saxofón barítono": 67,
     "Oboe": 68, "Fagot": 70, "Clarinete": 71, "Flauta": 73,
     "Flauta dulce": 74, "Flauta pan": 75, "Sinusoide (lead)": 80,
+}
+
+# -------------------- Parejas para dictados a 2 voces --------------------
+# (melody_program, bass_program)
+INSTRUMENT_PAIRS = {
+    "Piano acústico (dos manos)":      (0, 0),
+    "Piano eléctrico (dos manos)":     (4, 4),
+    "Clavicémbalo (dos manos)":        (6, 6),
+    "Flauta + Fagot":                  (73, 70),
+    "Trompeta + Trombón":              (56, 57),
+    "Violín + Violonchelo":            (40, 42),
+    "Oboe + Clarinete":                (68, 71),
 }
 
 # -------------------- Carga de archivo --------------------
@@ -75,26 +88,47 @@ with col2:
     tonic_midi = st.number_input("Tónica MIDI", min_value=0, max_value=127,
                                   value=detected['tonic_midi'])
 
-default_tempo = tempo_bpm_for_meter(num, den)
-tempo_bpm = st.slider("Tempo (bpm)", 30, 120, default_tempo,
-                      help="Convención: compuesto=50, binario=60")
-
 st.subheader("Instrumentos")
-
-inst_names = list(GM_PROGRAMS.keys())
-mel_name = st.selectbox("Voz superior (clave de sol)", inst_names,
-                        index=inst_names.index("Piano acústico"))
-melody_program = GM_PROGRAMS[mel_name]
 
 use_two = st.checkbox("Incluir 2ª voz (clave de fa)",
                       value=False,
                       disabled=detected['num_parts'] < 2,
                       help="Solo disponible si el MusicXML tiene ≥ 2 partes.")
-bass_program = None
+
 if use_two:
-    bass_name = st.selectbox("Voz inferior (clave de fa)", inst_names,
-                             index=inst_names.index("Violoncello"))
-    bass_program = GM_PROGRAMS[bass_name]
+    # Pareja aleatoria estable por archivo, con posibilidad de elegir a mano
+    pair_names = list(INSTRUMENT_PAIRS.keys())
+    pair_key = f"pair_for_{uploaded.name}"
+    if pair_key not in st.session_state:
+        st.session_state[pair_key] = random.choice(pair_names)
+
+    col_sel, col_rand = st.columns([4, 1])
+    with col_sel:
+        st.selectbox(
+            "Pareja de instrumentos",
+            pair_names,
+            key=pair_key,
+            help="Sugerida al azar al cargar el archivo. Despliega para elegir otra."
+        )
+    with col_rand:
+        st.write("")  # espaciador vertical
+        if st.button("🎲 Otra", help="Propuesta aleatoria"):
+            st.session_state[pair_key] = random.choice(pair_names)
+            st.rerun()
+
+    melody_program, bass_program = INSTRUMENT_PAIRS[st.session_state[pair_key]]
+else:
+    inst_names = list(GM_PROGRAMS.keys())
+    mel_name = st.selectbox("Voz superior (clave de sol)", inst_names,
+                            index=inst_names.index("Piano acústico"))
+    melody_program = GM_PROGRAMS[mel_name]
+    bass_program = None
+
+default_tempo = tempo_bpm_for_meter(num, den, two_voice=use_two)
+tempo_help = ("Convención 2 voces: compuesto=55, simple=65."
+              if use_two else
+              "Convención 1 voz: compuesto=50, simple=60.")
+tempo_bpm = st.slider("Tempo (bpm)", 30, 120, default_tempo, help=tempo_help)
 
 # -------------------- Generar --------------------
 if st.button("🎹 Generar MIDI", type="primary"):
@@ -127,3 +161,4 @@ if st.button("🎹 Generar MIDI", type="primary"):
     except Exception as e:
         st.error(f"Error al generar: {e}")
         st.exception(e)
+    
