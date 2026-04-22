@@ -46,7 +46,6 @@ INSTRUMENT_PAIRS = {
     "Flauta + Fagot":                  (73, 70),
     "Oboe + Fagot":                    (68, 70),
     "Clarinete + Fagot":               (71, 70),
-    "Violín + Violonchelo":            (40, 42),
 }
 
 # -------------------- Carga de archivo --------------------
