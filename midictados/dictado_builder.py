@@ -43,10 +43,13 @@ PERC_CRASH = 49
 PERC_COWBELL = 56
 PERC_SECTION = 59   # B2 en Logic = Ride Cymbal 2 en GM
 
-# ========== Gong (canal 3) ==========
+# ========== Gong (canal 3 - el usuario asigna Orchestral Kit en Logic) ==========
+# MIDI no permite cargar plugins automáticamente. El gong va en su propio
+# canal con Program Change placeholder; el usuario debe asignar "Orchestral Kit"
+# a este canal en Logic (idealmente guardando una plantilla).
 CH_GONG = 2         # canal 3 MIDI -> Logic crea pista separada
-PROG_GONG = 47      # Orchestra Hit (placeholder, reasignar Orchestral Kit en Logic)
-GONG_NOTE = 55      # G2 en Logic (C3 = middle C = 60)
+PROG_GONG = 47      # Orchestra Hit (placeholder)
+GONG_NOTE = 55      # G2 en Logic = gong en Orchestral Kit
 
 # ========== Convención de tempo ==========
 def tempo_bpm_for_meter(num: int, den: int) -> int:
@@ -194,14 +197,16 @@ class DictationMidiBuilder:
         play_ride = (section != prev_section)
         t = start
         t += self._section_indicator(t, play_ride)
-        t += self._rep_counter(t, rep_num)
+        # Cencerros solo en pases de frase (no en los "entero")
+        if section != 'entero':
+            t += self._rep_counter(t, rep_num)
         t += self._claqueta_previa(t)
         self._play_segment(t, segment, seg_len)
         return t + seg_len
 
     def _gong(self, start):
-        """Gong final ritual: G2 en canal 3 (reasignar Orchestral Kit en Logic)."""
-        self._note(start, CH_GONG, GONG_NOTE, 65, self.s_to_ticks(5.0))
+        """Gong final ritual: G2 en canal 3. Usuario asigna Orchestral Kit."""
+        self._note(start, CH_GONG, GONG_NOTE, 85, self.s_to_ticks(5.0))
 
     # ---------- Build + save ----------
     def build(self, output_path: str):
@@ -221,7 +226,7 @@ class DictationMidiBuilder:
         self._prog(0, self.CH_MEL, d.melody_program)
         if d.bass_program is not None:
             self._prog(0, self.CH_BASS, d.bass_program)
-        self._prog(0, CH_GONG, PROG_GONG)  # Orchestra Hit (usuario reasigna Orchestral Kit)
+        self._prog(0, CH_GONG, PROG_GONG)  # placeholder, el usuario asigna Orchestral Kit
 
         # Batería a -4 dB aprox vía CC7 (channel volume)
         # val = 127 * 10^(dB/40)  ->  -4 dB ≈ 101
@@ -240,7 +245,7 @@ class DictationMidiBuilder:
         # entero 1
         current = self._one_pass(current, 'entero', 1, melody, DICT_LEN, prev_sec)
         prev_sec = 'entero'
-        current += 8 * M
+        current += 4 * M  # reducido (antes 8M) — menos silencio antes de la 1ª frase
 
         # primeros x4
         for i in range(1, 5):
