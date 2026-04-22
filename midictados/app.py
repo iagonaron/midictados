@@ -44,9 +44,9 @@ INSTRUMENT_PAIRS = {
     "Piano eléctrico (dos manos)":     (4, 4),
     "Clavicémbalo (dos manos)":        (6, 6),
     "Flauta + Fagot":                  (73, 70),
-    "Trompeta + Trombón":              (56, 57),
+    "Oboe + Fagot":                    (68, 70),
+    "Clarinete + Fagot":               (71, 70),
     "Violín + Violonchelo":            (40, 42),
-    "Oboe + Clarinete":                (68, 71),
 }
 
 # -------------------- Carga de archivo --------------------
@@ -161,4 +161,3 @@ if st.button("🎹 Generar MIDI", type="primary"):
     except Exception as e:
         st.error(f"Error al generar: {e}")
         st.exception(e)
-    
