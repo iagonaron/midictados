@@ -55,11 +55,11 @@ def tempo_bpm_for_meter(num: int, den: int, two_voice: bool = False) -> int:
     """
     Tempo por convención:
       - 1 voz: compuesto 50 / simple 60
-      - 2 voces: compuesto 55 / simple 65 (para acercar la duración total a ~10 min)
+      - 2 voces: compuesto 55 / simple 60
     """
     is_compound = (den == 8 and num in (6, 9, 12)) or (den == 16 and num in (6, 9, 12))
     if two_voice:
-        return 55 if is_compound else 65
+        return 55 if is_compound else 60
     return 50 if is_compound else 60
 
 
