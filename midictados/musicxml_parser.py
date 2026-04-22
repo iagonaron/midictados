@@ -24,6 +24,18 @@ def _dur_to_ticks(ql: float) -> int:
     return int(round(ql * PPQ))
 
 
+def _normalize_tonic_octave(tonic_midi: int) -> int:
+    """
+    Ajusta la octava de la tónica detectada para que quede en [Do4, Si4] = [60, 71].
+    Rango cómodo para dictado pedagógico, con referencia La4 (MIDI 69) contenida dentro.
+    """
+    while tonic_midi >= 72:
+        tonic_midi -= 12
+    while tonic_midi < 60:
+        tonic_midi += 12
+    return tonic_midi
+
+
 def parse_musicxml(
     path: str,
     melody_program: int = 0,
@@ -56,6 +68,11 @@ def parse_musicxml(
     # --- Tonalidad ---
     key_label = force_key_label
     tonic_midi = force_tonic_midi
+    # --- Partes ---
+    parts = list(score.parts)
+    melody_part = parts[0] if parts else score
+    bass_part = parts[1] if len(parts) > 1 and use_two_voices else None
+
     if key_label is None or tonic_midi is None:
         k = score.analyze('key')
         # mido admite: 'C','Cm','D','Dm',...
@@ -63,17 +80,14 @@ def parse_musicxml(
         if key_label is None:
             key_label = detected_label
         if tonic_midi is None:
-            # Preferencia: última nota del score (práctica musical)
-            last = _last_melodic_note(score)
+            # Preferencia: última nota de la parte superior (melodía),
+            # NO la del bajo, para que la tónica de referencia caiga en rango agudo.
+            last = _last_melodic_note(melody_part)
             if last is not None:
                 tonic_midi = last.pitch.midi
             else:
                 tonic_midi = pitch.Pitch(k.tonic.name + '4').midi
-
-    # --- Partes ---
-    parts = list(score.parts)
-    melody_part = parts[0] if parts else score
-    bass_part = parts[1] if len(parts) > 1 and use_two_voices else None
+            tonic_midi = _normalize_tonic_octave(tonic_midi)
 
     melody_events = _part_to_events(melody_part)
     bass_events = _part_to_events(bass_part) if bass_part is not None else None
@@ -142,9 +156,11 @@ def detect_params(path: str) -> dict:
     num, den = (ts_list[0].numerator, ts_list[0].denominator) if ts_list else (4, 4)
     k = score.analyze('key')
     key_label = k.tonic.name.replace('-', 'b') + ('m' if k.mode == 'minor' else '')
-    last = _last_melodic_note(score)
-    tonic_midi = last.pitch.midi if last is not None else pitch.Pitch(k.tonic.name + '4').midi
     parts = list(score.parts)
+    melody_part = parts[0] if parts else score
+    last = _last_melodic_note(melody_part)
+    tonic_midi = last.pitch.midi if last is not None else pitch.Pitch(k.tonic.name + '4').midi
+    tonic_midi = _normalize_tonic_octave(tonic_midi)
     return {
         'time_sig_num': num,
         'time_sig_den': den,
