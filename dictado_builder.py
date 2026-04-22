@@ -114,6 +114,9 @@ class DictationMidiBuilder:
     def _prog(self, abs_tick, channel, program):
         self.events.append((abs_tick, -1, 'program_change', channel, program, 0))
 
+    def _cc(self, abs_tick, channel, cc_num, value):
+        self.events.append((abs_tick, -1, 'control_change', channel, cc_num, value))
+
     # ---------- Bloque intro ----------
     def _reference_block(self, start):
         t = start
@@ -154,7 +157,7 @@ class DictationMidiBuilder:
     def _claqueta_previa(self, start):
         t = start
         for i in range(2):
-            vel = 60 if i == 1 else 51
+            vel = 10 if i == 1 else 1   # acentuada=10, débil=1
             self._note(t, CH_DRUMS, PERC_SIDE_STICK, vel, SIXTEENTH)
             t += self.pulse_ticks
         return 2 * self.pulse_ticks
@@ -192,12 +195,13 @@ class DictationMidiBuilder:
         return t + seg_len
 
     def _badumtss(self, start):
+        """1ª caja suave, 2ª fuerte, hueco = tamaño de 1 caja, bombo+crash."""
         short = self.s_to_ticks(0.10)
-        gap = self.s_to_ticks(0.08)
+        gap = short                        # hueco = tamaño de 1 caja
         tail = self.s_to_ticks(1.0)
         t = start
-        self._note(t, CH_DRUMS, PERC_SNARE, 110, short); t += short
-        self._note(t, CH_DRUMS, PERC_SNARE, 110, short); t += short + gap
+        self._note(t, CH_DRUMS, PERC_SNARE, 75, short);  t += short
+        self._note(t, CH_DRUMS, PERC_SNARE, 115, short); t += short + gap
         self._note(t, CH_DRUMS, PERC_BASS_DRUM, 120, tail)
         self._note(t, CH_DRUMS, PERC_CRASH, 120, tail)
 
@@ -219,6 +223,10 @@ class DictationMidiBuilder:
         self._prog(0, self.CH_MEL, d.melody_program)
         if d.bass_program is not None:
             self._prog(0, self.CH_BASS, d.bass_program)
+
+        # Batería a -4 dB aprox vía CC7 (channel volume)
+        # val = 127 * 10^(dB/40)  ->  -4 dB ≈ 101
+        self._cc(0, CH_DRUMS, 7, 101)
 
         # 1 compás de silencio al principio
         current = 1 * M
@@ -283,6 +291,8 @@ class DictationMidiBuilder:
                 track.append(Message('note_off', note=d1, velocity=d2, channel=ch, time=dt))
             elif kind == 'program_change':
                 track.append(Message('program_change', program=d1, channel=ch, time=dt))
+            elif kind == 'control_change':
+                track.append(Message('control_change', control=d1, value=d2, channel=ch, time=dt))
         track.append(MetaMessage('end_of_track', time=0))
         mid.save(output_path)
         return output_path
