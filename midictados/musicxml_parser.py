@@ -5,8 +5,18 @@ Convierte un archivo MusicXML en la estructura DictationInput que
 consume dictado_builder.py.
 """
 from typing import Optional
-from music21 import converter, note, chord, key, meter, pitch
 from dictado_builder import DictationInput, build_chord_progression, PPQ
+
+# music21 se importa de forma diferida (lazy) porque tarda 30-60s en cargar.
+# No queremos bloquear el arranque de la app; solo se necesita al parsear.
+_m21 = None
+def _get_m21():
+    global _m21
+    if _m21 is None:
+        from music21 import converter, note, chord, key, meter, pitch
+        _m21 = dict(converter=converter, note=note, chord=chord,
+                    key=key, meter=meter, pitch=pitch)
+    return _m21
 
 
 def _dur_to_ticks(ql: float) -> int:
@@ -30,6 +40,8 @@ def parse_musicxml(
       - bass: ídem para la 2ª voz si use_two_voices=True
       - num_measures, time_sig, key, tonic
     """
+    m21 = _get_m21()
+    converter = m21['converter']; meter = m21['meter']; pitch = m21['pitch']
     score = converter.parse(path)
 
     # --- Compás ---
@@ -97,6 +109,8 @@ def parse_musicxml(
 
 def _part_to_events(part) -> list:
     """Stream → [(offset_ticks, midi_note, dur_ticks)]. Silencios omitidos."""
+    m21 = _get_m21()
+    note, chord = m21['note'], m21['chord']
     events = []
     flat = part.flatten().notesAndRests
     for el in flat:
@@ -114,12 +128,15 @@ def _part_to_events(part) -> list:
 
 def _last_melodic_note(score):
     """Devuelve la última note.Note del score (para validar tónica)."""
+    note = _get_m21()['note']
     notes = list(score.recurse().getElementsByClass(note.Note))
     return notes[-1] if notes else None
 
 
 def detect_params(path: str) -> dict:
     """Devuelve solo los parámetros detectados (sin construir DictationInput)."""
+    m21 = _get_m21()
+    converter = m21['converter']; meter = m21['meter']; pitch = m21['pitch']
     score = converter.parse(path)
     ts_list = score.recurse().getElementsByClass(meter.TimeSignature)
     num, den = (ts_list[0].numerator, ts_list[0].denominator) if ts_list else (4, 4)
